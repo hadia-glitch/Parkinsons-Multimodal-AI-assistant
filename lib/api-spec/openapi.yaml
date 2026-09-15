@@ -1,0 +1,469 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: assistant
+    description: Multimodal assistant workflows
+  - name: analysis
+    description: File analysis workflows
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /capabilities:
+    get:
+      operationId: getCapabilities
+      tags: [health]
+      summary: Get model and provider availability
+      responses:
+        "200":
+          description: Current optional capability availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+  /chat:
+    post:
+      operationId: chat
+      tags: [assistant]
+      summary: Run a multimodal assistant workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: Structured assistant response with trace and evidence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /research:
+    post:
+      operationId: research
+      tags: [assistant]
+      summary: Run a research-focused retrieval workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResearchInput"
+      responses:
+        "200":
+          description: Research summary with sources and verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analyze/image:
+    post:
+      operationId: analyzeImage
+      tags: [analysis]
+      summary: Analyze an uploaded image without diagnosing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileAnalysisInput"
+      responses:
+        "200":
+          description: Visual analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          description: Invalid or unsupported file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analyze/document:
+    post:
+      operationId: analyzeDocument
+      tags: [analysis]
+      summary: Extract text from an uploaded PDF or document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileAnalysisInput"
+      responses:
+        "200":
+          description: OCR and document extraction result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          description: Invalid or unsupported file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analyze/audio:
+    post:
+      operationId: analyzeAudio
+      tags: [analysis]
+      summary: Transcribe and extract non-diagnostic speech features
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileAnalysisInput"
+      responses:
+        "200":
+          description: Speech analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          description: Invalid or unsupported file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /analyze/video:
+    post:
+      operationId: analyzeVideo
+      tags: [analysis]
+      summary: Extract non-diagnostic gait features from an uploaded walking video
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileAnalysisInput"
+      responses:
+        "200":
+          description: Gait analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          description: Invalid or unsupported file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /screen:
+    post:
+      operationId: screen
+      tags: [analysis]
+      summary: Run combined speech + gait screening and fuse the scores
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ScreenInput"
+      responses:
+        "200":
+          description: Combined multimodal screening result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScreenResult"
+        "400":
+          description: Invalid request (no audio or video supplied)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: ["string", "null"]
+      required: [error]
+    Capabilities:
+      type: object
+      properties:
+        status:
+          type: string
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
+      required: [status, capabilities]
+    Capability:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        available:
+          type: boolean
+        detail:
+          type: string
+      required: [id, label, available, detail]
+    AttachmentInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [image, document, audio, video]
+        name:
+          type: string
+        extracted_text:
+          type: ["string", "null"]
+        observations:
+          type: array
+          items:
+            type: string
+      required: [type, name]
+    ChatInput:
+      type: object
+      properties:
+        message:
+          type: string
+          minLength: 1
+        language:
+          type: string
+          enum: [en, ur]
+        conversation_id:
+          type: ["string", "null"]
+        research_mode:
+          type: boolean
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttachmentInput"
+      required: [message, language, research_mode, attachments]
+    ResearchInput:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+        language:
+          type: string
+          enum: [en, ur]
+      required: [question, language]
+    FileAnalysisInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required: [file]
+    ScreenInput:
+      type: object
+      properties:
+        audio:
+          type: string
+          format: binary
+        video:
+          type: string
+          format: binary
+        language:
+          type: string
+          enum: [en, ur]
+    ScreenResult:
+      type: object
+      properties:
+        speech:
+          $ref: "#/components/schemas/AnalysisResponse"
+        gait:
+          $ref: "#/components/schemas/AnalysisResponse"
+        modalities_used:
+          type: array
+          items:
+            type: string
+            enum: [speech, gait]
+        speech_weight:
+          type: number
+        gait_weight:
+          type: number
+        combined_score:
+          type: ["number", "null"]
+        combined_label:
+          type: ["string", "null"]
+        care_plan:
+          type: ["string", "null"]
+        care_plan_available:
+          type: boolean
+        care_plan_warning:
+          type: ["string", "null"]
+        care_plan_sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Source"
+        disclaimer:
+          type: string
+      required: [modalities_used, speech_weight, gait_weight, combined_score, care_plan_available, disclaimer]
+    AssistantResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        language:
+          type: string
+          enum: [en, ur]
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Source"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+        agent_trace:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTrace"
+        safety:
+          $ref: "#/components/schemas/SafetyResult"
+        extracted_content:
+          type: array
+          items:
+            type: string
+        request_id:
+          type: string
+      required: [answer, language, sources, evidence, agent_trace, safety, extracted_content, request_id]
+    AnalysisResponse:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [image, document, audio, video]
+        status:
+          type: string
+          enum: [success, warning, error]
+        text:
+          type: string
+        observations:
+          type: array
+          items:
+            type: string
+        features:
+          type: object
+          additionalProperties: true
+        language:
+          type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [kind, status, text, observations, features, language, confidence, warnings]
+    Source:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        publisher:
+          type: string
+        retrieved_at:
+          type: string
+        relevance_score:
+          type: number
+        source_quality:
+          type: string
+        why_selected:
+          type: string
+      required: [id, title, url, publisher, retrieved_at, relevance_score, source_quality, why_selected]
+    Evidence:
+      type: object
+      properties:
+        id:
+          type: string
+        source_id:
+          type: string
+        passage:
+          type: string
+        relevance_score:
+          type: number
+        reranker_score:
+          type: ["number", "null"]
+      required: [id, source_id, passage, relevance_score, reranker_score]
+    AgentTrace:
+      type: object
+      properties:
+        agent:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+          enum: [success, warning, error, skipped, running]
+        summary:
+          type: string
+        metrics:
+          type: object
+          additionalProperties: true
+        warnings:
+          type: array
+          items:
+            type: string
+      required: [agent, label, status, summary, metrics, warnings]
+    SafetyResult:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        issues:
+          type: array
+          items:
+            type: string
+        requires_clinician:
+          type: boolean
+        disclaimer:
+          type: string
+      required: [passed, issues, requires_clinician, disclaimer]
+
